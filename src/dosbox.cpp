@@ -1112,6 +1112,21 @@ void DOSBOX_Init()
 	pstring->Set_help(
 	        "Apply Y-axis calibration parameters from the hotkeys ('auto' by default).");
 
+	pbool = secprop->Add_bool("hotplug", when_idle, true);
+	pbool->Set_help(
+	        "Automatically detect when a game controller is connected or disconnected\n"
+	        "(enabled by default).\n"
+	        "Currently, when this option is enabled, bindings will be reinitialized from the\n"
+	        "configured mapper file (or from defaults if it does not exist), so any unsaved\n"
+	        "binding changes made in the mapper UI will be lost whenever a controller is\n"
+	        "connected or disconnected. So you may wish to disable this option at least\n"
+	        "temporarily if you have issues losing unsaved bindings before you can save them,\n"
+	        "e.g. due to a misbehaving game controller that frequently connects /\n"
+	        "disconnects.\n"
+	        "When this option is disabled, only game controllers connected at startup will be\n"
+	        "visible to DOSBox, and any controllers that become disconnected after startup\n"
+	        "will not be available until the application is restarted.\n");
+
 	secprop = control->AddSection_prop("serial", &SERIAL_Init, changeable_at_runtime);
 	const std::vector<std::string> serials = {
 	        "dummy", "disabled", "mouse", "modem", "nullmodem", "direct"};

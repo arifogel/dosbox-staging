@@ -557,4 +557,7 @@ public:
 
 bool config_file_is_valid(const std_fs::path& path);
 
+Section_prop* get_joystick_section();
+Section_prop* get_sdl_section();
+
 #endif

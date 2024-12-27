@@ -1980,3 +1980,23 @@ bool config_file_is_valid(const std_fs::path& path)
 	fclose(file);
 	return false;
 }
+
+static Section_prop* get_section(const char* section_name)
+{
+	assert(control);
+
+	const auto sec = static_cast<Section_prop*>(control->GetSection(section_name));
+	assert(sec);
+
+	return sec;
+}
+
+Section_prop* get_joystick_section()
+{
+	return get_section("joystick");
+}
+
+Section_prop* get_sdl_section()
+{
+	return get_section("sdl");
+}
