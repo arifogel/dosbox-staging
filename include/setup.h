@@ -557,4 +557,10 @@ public:
 
 bool config_file_is_valid(const std_fs::path& path);
 
+/**
+ *  Pointer to up-to-date in-memory model of the [sdl] section of the
+ *  configuration.
+ */
+Section_prop* get_sdl_section();
+
 #endif

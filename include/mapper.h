@@ -83,4 +83,17 @@ void MAPPER_AutoType(std::vector<std::string> &sequence,
                      const uint32_t pacing_ms);
 void MAPPER_CheckEvent(SDL_Event *event);
 
+/**
+ * Handle a game controller being connected or disconnected by reiniitializing
+ * binds. Caller is responsible for any user interface updates, e.g. updating
+ * the mapper UI buttons to reflect joystick binds being added / removed.
+ *
+ * @param event A pointer to an SDL_JoyDeviceEvent whose type must be one of:
+ * - SDL_CONTROLLERDEVICEADDED
+ * - SDL_CONTROLLERDEVICEREMOVED
+ * - SDL_JOYDEVICEADDED
+ * - SDL_JOYDEVICEREMOVED
+ */
+void MAPPER_HandleJoyDeviceEvent(SDL_JoyDeviceEvent* event);
+
 #endif

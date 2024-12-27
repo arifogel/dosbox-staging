@@ -749,10 +749,8 @@ public:
 
 			if (event->jaxis.which != stick_id)
 				return nullptr;
-#if defined(REDUCE_JOYSTICK_POLLING)
 			if (axis_id >= axes)
 				return nullptr;
-#endif
 			if (abs(axis_position) < 25000)
 				return nullptr;
 
@@ -764,11 +762,7 @@ public:
 		} else if (event->type == SDL_JOYBUTTONDOWN) {
 			if (event->jbutton.which != stick_id)
 				return nullptr;
-#if defined (REDUCE_JOYSTICK_POLLING)
-			return CreateButtonBind(event->jbutton.button%button_wrap);
-#else
-			return CreateButtonBind(event->jbutton.button);
-#endif
+			return CreateButtonBind(event->jbutton.button % button_wrap);
 		} else if (event->type==SDL_JOYHATMOTION) {
 			if (event->jhat.which != stick_id) return nullptr;
 			if (event->jhat.value == 0) return nullptr;
@@ -794,15 +788,18 @@ public:
 			case SDL_JOYBUTTONDOWN:
 			case SDL_JOYBUTTONUP:
 				jbutton = &event->jbutton;
-				bool state;
-				state = jbutton->type == SDL_JOYBUTTONDOWN;
-				const auto but = check_cast<uint8_t>(jbutton->button % emulated_buttons);
-				if (jbutton->which == stick_id) {
-					JOYSTICK_Button(emustick, but, state);
-				}
-				break;
-			}
-			return false;
+			        if (jbutton->which != stick_id) {
+				        break;
+			        }
+			        bool state;
+			        state = jbutton->type == SDL_JOYBUTTONDOWN;
+			        const auto but = check_cast<uint8_t>(
+			                button_wrap ? jbutton->button % emulated_buttons
+			                            : jbutton->button);
+			        JOYSTICK_Button(emustick, but, state);
+			        break;
+		        }
+		        return false;
 	}
 
 	virtual void UpdateJoystick() {
@@ -2101,7 +2098,12 @@ static void SetActiveEvent(CEvent * event) {
 			SetActiveBind(*(mapper.abindit));
 
 			const auto new_bind = dynamic_cast<CKeyBind*>(*mapper.abindit);
-			drop_other_bound_events(new_bind);
+			// TODO: version of drop_other_bound_events that works
+			// for joystick binds, for which above line assigns
+			// nullptr to newbind and causes assertion failure
+			if (new_bind) {
+				drop_other_bound_events(new_bind);
+			}
 
 		} else SetActiveBind(nullptr);
 		bind_but.add->Enable(true);
@@ -2858,17 +2860,68 @@ static bool load_binds_from_file(const std::string_view mapperfile_path,
 
 void MAPPER_CheckEvent(SDL_Event *event)
 {
-	for (auto &group : bindgroups)
-		if (group->CheckEvent(event))
+	switch (event->type) {
+	case SDL_CONTROLLERDEVICEADDED:
+	case SDL_CONTROLLERDEVICEREMOVED:
+	case SDL_JOYDEVICEREMOVED:
+	case SDL_JOYDEVICEADDED:
+		MAPPER_HandleJoyDeviceEvent(
+		        reinterpret_cast<SDL_JoyDeviceEvent*>(event));
+		return;
+	default: break;
+	}
+
+	for (auto& group : bindgroups) {
+		if (group->CheckEvent(event)) {
 			return;
+		}
+	}
 }
 
-void BIND_MappingEvents() {
+void MAPPER_HandleJoyDeviceEvent(SDL_JoyDeviceEvent* event)
+{
+	switch (event->type) {
+	case SDL_CONTROLLERDEVICEADDED:
+	case SDL_JOYDEVICEADDED: {
+		auto index    = event->which;
+		auto joystick = SDL_JoystickOpen(index);
+		auto name     = SDL_JoystickName(joystick);
+		LOG_INFO("MAPPER: Game controller '%s' has been plugged in", name);
+		SDL_JoystickClose(joystick);
+		break;
+	}
+	case SDL_CONTROLLERDEVICEREMOVED:
+	case SDL_JOYDEVICEREMOVED: {
+		auto joystick = SDL_JoystickFromInstanceID(event->which);
+		auto name     = SDL_JoystickName(joystick);
+		LOG_INFO("MAPPER: Game controller '%s' has been disconnected", name);
+		SDL_JoystickClose(joystick);
+		break;
+	}
+	default:
+		LOG_DEBUG("MAPPER:  MAPPER_HandleJoyDeviceEvent: Unexpected event type '%d' received",
+		          event->type);
+		assert(false);
+	}
+	MAPPER_BindKeys(get_sdl_section());
+	mapper.redraw = true;
+}
+
+void BIND_MappingEvents()
+{
 	SDL_Event event;
 	static bool isButtonPressed = false;
 	static CButton *lastHoveredButton = nullptr;
 	while (SDL_PollEvent(&event)) {
 		switch (event.type) {
+		case SDL_CONTROLLERDEVICEADDED:
+		case SDL_CONTROLLERDEVICEREMOVED:
+		case SDL_JOYDEVICEREMOVED:
+		case SDL_JOYDEVICEADDED:
+			MAPPER_HandleJoyDeviceEvent(
+			        reinterpret_cast<SDL_JoyDeviceEvent*>(&event));
+			mapper.redraw = true;
+			break;
 		case SDL_MOUSEBUTTONDOWN:
 			isButtonPressed = true;
 			/* Further check where are we pointing at right now */
@@ -3053,17 +3106,9 @@ static void CreateBindGroups() {
 		return;
 
 	if (joytype != JOY_NONE_FOUND) {
-#if defined (REDUCE_JOYSTICK_POLLING)
-		// direct access to the SDL joystick, thus removed from the event handling
-		if (mapper.sticks.num)
-			SDL_JoystickEventState(SDL_DISABLE);
-#else
 		// enable joystick event handling
 		if (mapper.sticks.num)
 			SDL_JoystickEventState(SDL_ENABLE);
-		else
-			return;
-#endif
 		// Free up our previously assigned joystick slot before assinging below
 		if (mapper.sticks.stick[mapper.sticks.num_groups]) {
 			delete mapper.sticks.stick[mapper.sticks.num_groups];
@@ -3120,15 +3165,12 @@ static void CreateBindGroups() {
 bool MAPPER_IsUsingJoysticks() {
 	return (mapper.sticks.num > 0);
 }
-
-#if defined (REDUCE_JOYSTICK_POLLING)
 void MAPPER_UpdateJoysticks() {
 	for (Bitu i=0; i<mapper.sticks.num_groups; i++) {
 		assert(mapper.sticks.stick[i]);
 		mapper.sticks.stick[i]->UpdateJoystick();
 	}
 }
-#endif
 
 void MAPPER_LosingFocus() {
 	for (const auto& event : events) {
@@ -3249,9 +3291,6 @@ void MAPPER_DisplayUI() {
 	mapper.exit = false;
 	mapper.redraw=true;
 	SetActiveEvent(nullptr);
-#if defined (REDUCE_JOYSTICK_POLLING)
-	SDL_JoystickEventState(SDL_ENABLE);
-#endif
 	while (!mapper.exit) {
 		if (mapper.redraw) {
 			mapper.redraw = false;
@@ -3283,9 +3322,6 @@ void MAPPER_DisplayUI() {
 			        SDL_GetError());
 		}
 	}
-#endif
-#if defined (REDUCE_JOYSTICK_POLLING)
-	SDL_JoystickEventState(SDL_DISABLE);
 #endif
 	GFX_ResetScreen();
 	MOUSE_NotifyTakeOver(false);
@@ -3368,8 +3404,7 @@ void MAPPER_BindKeys(Section* sec)
 	if (buttons.empty())
 		CreateLayout();
 
-	if (bindgroups.empty())
-		CreateBindGroups();
+	CreateBindGroups();
 
 	// Create binds from file or fallback to internals
 	if (!load_binds_from_file(mapper.filename, mapperfile_value))
@@ -3384,8 +3419,6 @@ void MAPPER_BindKeys(Section* sec)
 
 	if (SDL_GetModState()&KMOD_NUM)
 		MAPPER_TriggerEvent(num_lock_event, false);
-
-	GFX_RegenerateWindow(sec);
 }
 
 std::vector<std::string> MAPPER_GetEventNames(const std::string &prefix) {
@@ -3411,6 +3444,7 @@ void MAPPER_StartUp(Section* sec)
 	// mapperfile=file.map"` commands
 	constexpr auto changeable_at_runtime = true;
 	section->AddInitFunction(&MAPPER_BindKeys, changeable_at_runtime);
+	section->AddInitFunction(&GFX_RegenerateWindow, changeable_at_runtime);
 
 	// Runs one-time on shutdown
 	section->AddDestroyFunction(&MAPPER_Destroy);
