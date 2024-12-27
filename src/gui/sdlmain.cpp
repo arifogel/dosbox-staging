@@ -453,16 +453,6 @@ static double get_host_refresh_rate()
 	return refresh_rate;
 }
 
-static Section_prop* get_sdl_section()
-{
-	assert(control);
-
-	auto sdl_section = static_cast<Section_prop*>(control->GetSection("sdl"));
-	assert(sdl_section);
-
-	return sdl_section;
-}
-
 // Reset and populate the vsync settings from the config. This is
 // called on-demand after startup and on output mode changes (e.g., switching
 // from the 'texture' backend to 'opengl').
@@ -3815,29 +3805,8 @@ static void handle_user_event(const SDL_Event& event)
 
 bool GFX_Events()
 {
-#if defined(MACOSX)
-	// Don't poll too often. This can be heavy on the OS, especially Macs.
-	// In idle mode 3000-4000 polls are done per second without this check.
-	// Macs, with this code,  max 250 polls per second. (non-macs unused
-	// default max 500). Currently not implemented for all platforms, given
-	// the ALT-TAB stuff for WIN32.
-	static auto last_check = GetTicks();
-	auto current_check = GetTicks();
-	if (GetTicksDiff(current_check, last_check) <= DB_POLLSKIP)
-		return true;
-	last_check = current_check;
-#endif
-
 	SDL_Event event;
-#if defined (REDUCE_JOYSTICK_POLLING)
-	static auto last_check_joystick = GetTicks();
-	auto current_check_joystick = GetTicks();
-	if (GetTicksDiff(current_check_joystick, last_check_joystick) > 20) {
-		last_check_joystick = current_check_joystick;
-		if (MAPPER_IsUsingJoysticks()) SDL_JoystickUpdate();
-		MAPPER_UpdateJoysticks();
-	}
-#endif
+	MAPPER_UpdateJoysticks();
 	while (SDL_PollEvent(&event)) {
 #if C_DEBUG
 		if (is_debugger_event(event)) {
@@ -5094,6 +5063,7 @@ int sdl_main(int argc, char* argv[])
 		// All subsystems' hotkeys need to be registered at this point
 		// to ensure their hotkeys appear in the graphical mapper.
 		MAPPER_BindKeys(sdl_sec);
+		GFX_RegenerateWindow(sdl_sec);
 
 		if (arguments->startmapper) {
 			MAPPER_DisplayUI();
