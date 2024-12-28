@@ -2101,7 +2101,12 @@ static void SetActiveEvent(CEvent * event) {
 			SetActiveBind(*(mapper.abindit));
 
 			const auto new_bind = dynamic_cast<CKeyBind*>(*mapper.abindit);
-			drop_other_bound_events(new_bind);
+			// TODO: version of drop_other_bound_events that works
+			// for joystick binds, for which above line assigns
+			// nullptr to newbind and causes assertion failure
+			if (new_bind) {
+				drop_other_bound_events(new_bind);
+			}
 
 		} else SetActiveBind(nullptr);
 		bind_but.add->Enable(true);
