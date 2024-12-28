@@ -312,7 +312,15 @@ public:
 			event->DeActivateEvent(ev_trigger);
 		}
 	}
-	virtual void ConfigName(char * buf)=0;
+
+	const char* GetEventName() const
+	{
+		return event ? event->GetName() : "";
+	}
+
+	virtual bool HasSameBinding(const CBind* other) const = 0;
+
+	virtual void ConfigName(char* buf) = 0;
 
 	virtual std::string GetBindName() const = 0;
 
@@ -404,14 +412,13 @@ public:
 		return sdl_scancode_name;
 	}
 
-	bool HasSameBinding(const CKeyBind* other) const
+	bool HasSameBinding(const CBind* other) const override
 	{
-		return other && key == other->key && mods == other->mods;
-	}
-
-	const char* GetEventName() const
-	{
-		return event ? event->GetName() : "";
+		const auto other_typed = dynamic_cast<const CKeyBind*>(other);
+		if (!other_typed) {
+			return false;
+		}
+		return other_typed && key == other_typed->key && mods == other->mods;
 	}
 
 	void ConfigName(char *buf) override
@@ -526,6 +533,16 @@ public:
 		return buf;
 	}
 
+	bool HasSameBinding(const CBind* other) const override
+	{
+		const auto other_typed = dynamic_cast<const CJAxisBind*>(other);
+		if (!other_typed) {
+			return false;
+		}
+		return other_typed && axis == other_typed->axis &&
+		       positive == other_typed->positive && mods == other->mods;
+	}
+
 protected:
 	CBindGroup *group;
 	int axis;
@@ -553,6 +570,16 @@ public:
 		char buf[30];
 		safe_sprintf(buf, "%s Button %d", group->BindStart(), button);
 		return buf;
+	}
+
+	bool HasSameBinding(const CBind* other) const override
+	{
+		const auto other_typed = dynamic_cast<const CJButtonBind*>(other);
+		if (!other_typed) {
+			return false;
+		}
+		return other_typed && button == other_typed->button &&
+		       mods == other->mods;
 	}
 
 protected:
@@ -600,6 +627,16 @@ public:
 		              : (dir == SDL_HAT_DOWN)  ? "down"
 		                                       : "left"));
 		return buf;
+	}
+
+	bool HasSameBinding(const CBind* other) const override
+	{
+		const auto other_typed = dynamic_cast<const CJHatBind*>(other);
+		if (!other_typed) {
+			return false;
+		}
+		return other_typed && hat == other_typed->hat &&
+		       dir == other_typed->dir && mods == other->mods;
 	}
 
 protected:
@@ -1873,9 +1910,11 @@ public:
 
 	void Active(bool yesno) override { (*handler)(yesno); }
 
-	bool HasSameBinding(const CKeyBind* other) const
+	bool HasSameBinding(const CBind* other) const
 	{
-		return other && defkey == other->key && defmod == other->mods;
+		auto other_keybind = dynamic_cast<const CKeyBind*>(other);
+		return other_keybind && defkey == other_keybind->key &&
+		       defmod == other->mods;
 	}
 
 	const char* GetEventName() const
@@ -2040,7 +2079,7 @@ static void SetActiveBind(CBind *new_active_bind)
 	update_active_bind_ui();
 }
 
-// Drop other bound events for the given new_bind to ensure a given host button
+// Drop other bound events for the given new_bind to ensure a given host input
 // sequence only performs one event.
 //
 // For example, if the host's 'F10' button was previously recording MIDI but now
@@ -2052,10 +2091,8 @@ static void drop_other_bound_events(const T* new_bind)
 {
 	assert(new_bind);
 
-	auto has_same_bind_as_new_bind = [new_bind](CBind* other) {
-		auto other_bind = dynamic_cast<CKeyBind*>(other);
-
-		if constexpr (std::is_same_v<T, CKeyBind>) {
+	auto has_same_bind_as_new_bind = [new_bind](CBind* other_bind) {
+		if constexpr (std::is_same_v<T, CBind>) {
 			if (!other_bind || new_bind->event == other_bind->event) {
 				return false;
 			}
@@ -2063,7 +2100,7 @@ static void drop_other_bound_events(const T* new_bind)
 
 		if (new_bind->HasSameBinding(other_bind)) {
 			const auto msg = format_str(
-			        "Host button '%s' now performs '%s' instead of '%s'",
+			        "Host input '%s' now performs '%s' instead of '%s'",
 			        other_bind->GetBindName().c_str(),
 			        new_bind->GetEventName(),
 			        other_bind->GetEventName());
@@ -2071,8 +2108,8 @@ static void drop_other_bound_events(const T* new_bind)
 			LOG_WARNING("MAPPER: %s", msg.c_str());
 			change_action_text(msg.c_str(), marginal_color);
 
-			all_binds.remove(other);
-			other->event = nullptr;
+			all_binds.remove(other_bind);
+			other_bind->event = nullptr;
 
 			return true;
 		}
@@ -2099,10 +2136,7 @@ static void SetActiveEvent(CEvent * event) {
 		mapper.abindit=event->bindlist.begin();
 		if (mapper.abindit!=event->bindlist.end()) {
 			SetActiveBind(*(mapper.abindit));
-
-			const auto new_bind = dynamic_cast<CKeyBind*>(*mapper.abindit);
-			drop_other_bound_events(new_bind);
-
+			drop_other_bound_events(*mapper.abindit);
 		} else SetActiveBind(nullptr);
 		bind_but.add->Enable(true);
 	}
