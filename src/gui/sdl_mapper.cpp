@@ -63,10 +63,7 @@ constexpr Rgb888 color_white(255, 255, 255);
 constexpr Rgb888 color_red(255, 0, 0);
 constexpr Rgb888 color_green(0, 255, 0);
 
-enum BB_Types {
-	BB_Next,BB_Add,BB_Del,
-	BB_Save,BB_Exit
-};
+enum BB_Types { BB_Next, BB_Add, BB_Del, BB_Exit };
 
 enum BC_Types {
 	BC_Mod1,BC_Mod2,BC_Mod3,
@@ -1644,8 +1641,12 @@ public:
 				if (mapper.abindit == mapper.aevent->bindlist.end())
 					mapper.abindit=mapper.aevent->bindlist.begin();
 			}
-			if (mapper.abindit!=mapper.aevent->bindlist.end()) SetActiveBind(*(mapper.abindit));
-			else SetActiveBind(nullptr);
+			if (mapper.abindit != mapper.aevent->bindlist.end()) {
+				SetActiveBind(*(mapper.abindit));
+			} else {
+				SetActiveBind(nullptr);
+			}
+			MAPPER_SaveBinds();
 			break;
 		case BB_Next:
 			if (mapper.abindit != mapper.aevent->bindlist.end())
@@ -1653,9 +1654,6 @@ public:
 			if (mapper.abindit == mapper.aevent->bindlist.end())
 				mapper.abindit = mapper.aevent->bindlist.begin();
 			SetActiveBind(*(mapper.abindit));
-			break;
-		case BB_Save:
-			MAPPER_SaveBinds();
 			break;
 		case BB_Exit:
 			mapper.exit=true;
@@ -2548,7 +2546,6 @@ static void CreateLayout() {
 	bind_but.del = new CBindButton(250, 400, 100, 20, "Remove bind", BB_Del);
 	bind_but.next = new CBindButton(250, 420, 100, 20, "Next bind", BB_Next);
 
-	bind_but.save=new CBindButton(400,450,50,20,"Save",BB_Save);
 	bind_but.exit=new CBindButton(450,450,50,20,"Exit",BB_Exit);
 
 	bind_but.bind_title->Change("Bind Title");
@@ -2948,6 +2945,7 @@ void BIND_MappingEvents() {
 				mapper.aevent->AddBind(newbind);
 				SetActiveEvent(mapper.aevent);
 				mapper.addbind=false;
+				MAPPER_SaveBinds();
 				break;
 			}
 		}
