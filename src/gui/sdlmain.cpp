@@ -3819,7 +3819,6 @@ bool GFX_Events()
 #endif
 
 	SDL_Event event;
-	MAPPER_UpdateJoysticks();
 	while (SDL_PollEvent(&event)) {
 #if C_DEBUG
 		if (is_debugger_event(event)) {

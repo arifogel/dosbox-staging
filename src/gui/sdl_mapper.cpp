@@ -769,18 +769,25 @@ public:
 				}
 				break;
 			case SDL_JOYBUTTONDOWN:
-			case SDL_JOYBUTTONUP:
+			case SDL_JOYBUTTONUP: {
 				jbutton = &event->jbutton;
-			        if (jbutton->which != stick_id) {
-				        break;
-			        }
-			        const bool state = jbutton->type == SDL_JOYBUTTONDOWN;
-			        const auto but = check_cast<uint8_t>(
-			                jbutton->button % emulated_buttons);
-			        JOYSTICK_Button(emustick, but, state);
-			        break;
-		        }
-		        return false;
+				if (jbutton->which != stick_id) {
+					break;
+				}
+				const bool state = jbutton->type == SDL_JOYBUTTONDOWN;
+				const auto but = check_cast<uint8_t>(
+					jbutton->button % emulated_buttons);
+				JOYSTICK_Button(emustick, but, state);
+				break;
+			}
+			case SDL_JOYBALLMOTION:
+		    case SDL_JOYHATMOTION:
+			    break;
+			default:
+				return false;
+		}
+		MAPPER_UpdateJoysticks();
+		return true;
 	}
 
 	virtual void UpdateJoystick() {
