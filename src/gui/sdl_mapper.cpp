@@ -758,32 +758,42 @@ public:
 	}
 
 	bool CheckEvent(SDL_Event * event) override {
-		SDL_JoyAxisEvent * jaxis = nullptr;
-		SDL_JoyButtonEvent *jbutton = nullptr;
-
 		switch(event->type) {
-			case SDL_JOYAXISMOTION:
-				jaxis = &event->jaxis;
-				if(jaxis->which == stick_id) {
-					if(jaxis->axis == 0)
-						JOYSTICK_Move_X(emustick, jaxis->value);
-					else if (jaxis->axis == 1)
-						JOYSTICK_Move_Y(emustick, jaxis->value);
-				}
-				break;
-			case SDL_JOYBUTTONDOWN:
-			case SDL_JOYBUTTONUP:
-				jbutton = &event->jbutton;
-			        if (jbutton->which != stick_id) {
-				        break;
-			        }
-			        const bool state = jbutton->type == SDL_JOYBUTTONDOWN;
-			        const auto but = check_cast<uint8_t>(
-			                jbutton->button % emulated_buttons);
-			        JOYSTICK_Button(emustick, but, state);
-			        break;
-		        }
-		        return false;
+		case SDL_JOYBALLMOTION: {
+			auto jball = &event->jball;
+			if (jball->which != stick_id) {
+				return false;;
+			}
+			UpdateJoystick();
+			return true;
+		}
+		case SDL_JOYHATMOTION: {
+			auto jhat = &event->jhat;
+			if(jhat->which != stick_id) {
+				return false;
+			}
+			UpdateJoystick();
+			return true;
+		}
+		case SDL_JOYAXISMOTION: {
+			auto jaxis = &event->jaxis;
+			if(jaxis->which != stick_id) {
+				return false;
+			}
+			UpdateJoystick();
+			return true;
+		}
+		case SDL_JOYBUTTONDOWN:
+		case SDL_JOYBUTTONUP: {
+			auto jbutton = &event->jbutton;
+			if (jbutton->which != stick_id) {
+				return false;
+			}
+			UpdateJoystick();
+			return true;
+		}
+		}
+		return false;
 	}
 
 	virtual void UpdateJoystick() {
@@ -1024,34 +1034,6 @@ public:
 		JOYSTICK_Enable(1, true);
 	}
 
-	bool CheckEvent(SDL_Event * event) override {
-		SDL_JoyAxisEvent * jaxis = nullptr;
-		SDL_JoyButtonEvent *jbutton = nullptr;
-
-		switch(event->type) {
-			case SDL_JOYAXISMOTION:
-				jaxis = &event->jaxis;
-				if(jaxis->which == stick_id && jaxis->axis < 4) {
-					if(jaxis->axis & 1)
-						JOYSTICK_Move_Y(jaxis->axis >> 1 & 1, jaxis->value);
-					else
-						JOYSTICK_Move_X(jaxis->axis >> 1 & 1, jaxis->value);
-		        }
-		        break;
-			case SDL_JOYBUTTONDOWN:
-			case SDL_JOYBUTTONUP:
-				jbutton = &event->jbutton;
-				bool state;
-				state = jbutton->type == SDL_JOYBUTTONDOWN;
-				const auto but = check_cast<uint8_t>(jbutton->button % emulated_buttons);
-				if (jbutton->which == stick_id) {
-					JOYSTICK_Button((but >> 1), (but & 1), state);
-				}
-				break;
-		}
-		return false;
-	}
-
 	void UpdateJoystick() override {
 		/* query SDL joystick and activate bindings */
 		ActivateJoystickBoundEvents();
@@ -1089,37 +1071,41 @@ public:
 	}
 
 	bool CheckEvent(SDL_Event * event) override {
-		SDL_JoyAxisEvent * jaxis = nullptr;
-		SDL_JoyButtonEvent * jbutton = nullptr;
-		SDL_JoyHatEvent *jhat = nullptr;
-
 		switch(event->type) {
-			case SDL_JOYAXISMOTION:
-				jaxis = &event->jaxis;
-				if(jaxis->which == stick_id) {
+			case SDL_JOYAXISMOTION: {
+				auto jaxis = &event->jaxis;
+				if(jaxis->which != stick_id) {
+					return false;
+				}
+				UpdateJoystick();
 					if(jaxis->axis == 0)
 						JOYSTICK_Move_X(0, jaxis->value);
 					else if (jaxis->axis == 1)
 						JOYSTICK_Move_Y(0, jaxis->value);
 					else if (jaxis->axis == 2)
 						JOYSTICK_Move_X(1, jaxis->value);
+				break;
+			}
+			case SDL_JOYHATMOTION: {
+				auto jhat = &event->jhat;
+				if(jhat->which != stick_id) {
+					return false;
 				}
-				break;
-			case SDL_JOYHATMOTION:
-				jhat = &event->jhat;
-				if (jhat->which == stick_id)
-					DecodeHatPosition(jhat->value);
-				break;
+				UpdateJoystick();
+				DecodeHatPosition(jhat->value);
+			}
 			case SDL_JOYBUTTONDOWN:
-			case SDL_JOYBUTTONUP:
-				jbutton = &event->jbutton;
-			bool state;
-			state=jbutton->type==SDL_JOYBUTTONDOWN;
-				const auto but = check_cast<uint8_t>(jbutton->button % emulated_buttons);
-				if (jbutton->which == stick_id) {
-					JOYSTICK_Button((but >> 1), (but & 1), state);
+			case SDL_JOYBUTTONUP: {
+				auto jbutton = &event->jbutton;
+				if(jbutton->which != stick_id) {
+					return false;
 				}
+				UpdateJoystick();
+				const bool state=jbutton->type==SDL_JOYBUTTONDOWN;
+				const auto but = check_cast<uint8_t>(jbutton->button % emulated_buttons);
+				JOYSTICK_Button((but >> 1), (but & 1), state);
 				break;
+			}
 		}
 		return false;
 	}
@@ -1215,28 +1201,33 @@ public:
 	}
 
 	bool CheckEvent(SDL_Event * event) override {
-		SDL_JoyAxisEvent * jaxis = nullptr;
-		SDL_JoyButtonEvent * jbutton = nullptr;
-		SDL_JoyHatEvent * jhat = nullptr;
-		Bitu but = 0;
 		static const unsigned button_magic[6] = {
 		        0x02, 0x04, 0x10, 0x100, 0x20, 0x200};
 		static const unsigned hat_magic[2][5] = {
 		        {0x8888, 0x8000, 0x800, 0x80, 0x08},
 		        {0x5440, 0x4000, 0x400, 0x40, 0x1000}};
 		switch(event->type) {
-			case SDL_JOYAXISMOTION:
-				jaxis = &event->jaxis;
-				if(jaxis->which == stick_id && jaxis->axis < 4) {
+			case SDL_JOYAXISMOTION: {
+				auto jaxis = &event->jaxis;
+				if(jaxis->which != stick_id) {
+					return false;
+				}
+				UpdateJoystick();
+				if(jaxis->axis < 4) {
 					if(jaxis->axis & 1)
 						JOYSTICK_Move_Y(jaxis->axis >> 1 & 1, jaxis->value);
 					else
 						JOYSTICK_Move_X(jaxis->axis >> 1 & 1, jaxis->value);
 				}
 				break;
-			case SDL_JOYHATMOTION:
-				jhat = &event->jhat;
-				if (jhat->which == stick_id && jhat->hat < 2) {
+			}
+			case SDL_JOYHATMOTION: {
+				auto jhat = &event->jhat;
+				if(jhat->which != stick_id) {
+					return false;
+				}
+				UpdateJoystick();
+				if (jhat->hat < 2) {
 					if (jhat->value == SDL_HAT_CENTERED)
 						button_state &= ~hat_magic[jhat->hat][0];
 					if (jhat->value & SDL_HAT_UP)
@@ -1249,18 +1240,23 @@ public:
 						button_state|=hat_magic[jhat->hat][4];
 				}
 				break;
+			}
 			case SDL_JOYBUTTONDOWN:
-				jbutton = &event->jbutton;
-				but = jbutton->button % emulated_buttons;
-				if (jbutton->which == stick_id)
+			case SDL_JOYBUTTONUP: {
+				auto jbutton = &event->jbutton;
+				if(jbutton->which != stick_id) {
+					return false;
+				}
+				UpdateJoystick();
+				Bitu but = jbutton->button % emulated_buttons;
+				if (event->type == SDL_JOYBUTTONDOWN) {
 					button_state|=button_magic[but];
-				break;
-			case SDL_JOYBUTTONUP:
-				jbutton = &event->jbutton;
-				but = jbutton->button % emulated_buttons;
-				if (jbutton->which == stick_id)
+				} else {
+					assert(event->type == SDL_JOYBUTTONUP);
 					button_state&=~button_magic[but];
+				}
 				break;
+			}
 		}
 
 		unsigned i;
@@ -2795,7 +2791,6 @@ void MAPPER_CheckEvent(SDL_Event *event)
 	default: break;
 	}
 
-	MAPPER_UpdateJoysticks();
 	for (auto& group : bindgroups) {
 		if (group->CheckEvent(event)) {
 			return;
@@ -3109,13 +3104,6 @@ static void CreateBindGroups()
 			}
 			break;
 		}
-	}
-}
-
-void MAPPER_UpdateJoysticks() {
-	for (Bitu i=0; i<mapper.sticks.num_groups; i++) {
-		assert(mapper.sticks.stick[i]);
-		mapper.sticks.stick[i]->UpdateJoystick();
 	}
 }
 
