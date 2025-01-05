@@ -1025,30 +1025,6 @@ public:
 	}
 
 	bool CheckEvent(SDL_Event * event) override {
-		SDL_JoyAxisEvent * jaxis = nullptr;
-		SDL_JoyButtonEvent *jbutton = nullptr;
-
-		switch(event->type) {
-			case SDL_JOYAXISMOTION:
-				jaxis = &event->jaxis;
-				if(jaxis->which == stick_id && jaxis->axis < 4) {
-					if(jaxis->axis & 1)
-						JOYSTICK_Move_Y(jaxis->axis >> 1 & 1, jaxis->value);
-					else
-						JOYSTICK_Move_X(jaxis->axis >> 1 & 1, jaxis->value);
-		        }
-		        break;
-			case SDL_JOYBUTTONDOWN:
-			case SDL_JOYBUTTONUP:
-				jbutton = &event->jbutton;
-				bool state;
-				state = jbutton->type == SDL_JOYBUTTONDOWN;
-				const auto but = check_cast<uint8_t>(jbutton->button % emulated_buttons);
-				if (jbutton->which == stick_id) {
-					JOYSTICK_Button((but >> 1), (but & 1), state);
-				}
-				break;
-		}
 		return false;
 	}
 
